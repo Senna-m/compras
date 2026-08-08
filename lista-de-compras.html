@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lista de compras</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Work+Sans:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #F6EFE1;
+    --paper-2: #EFE5CE;
+    --board: #22402C;
+    --board-2: #1A3222;
+    --chalk: #F2EFE4;
+    --ink: #2B2620;
+    --ink-soft: #6B6255;
+    --mustard: #C99A3B;
+    --mustard-ink: #6B4E14;
+    --brick: #A8452F;
+    --brick-ink: #5C220F;
+    --sage: #6F8F6C;
+    --sage-ink: #33482F;
+    --line: #DCCFAF;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family:'Work Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom: 100px;
+  }
+  .board{
+    background: var(--board);
+    background-image:
+      radial-gradient(circle at 15% 30%, rgba(255,255,255,0.02) 0, transparent 40%),
+      radial-gradient(circle at 85% 70%, rgba(255,255,255,0.02) 0, transparent 40%);
+    color: var(--chalk);
+    padding: 2.5rem 1.5rem 2.2rem;
+    text-align:center;
+    border-bottom: 6px solid var(--paper-2);
+    position:relative;
+  }
+  .board h1{
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size: clamp(2.6rem, 8vw, 3.6rem);
+    margin:0;
+    letter-spacing: 0.5px;
+    transform: rotate(-1deg);
+  }
+  .board p{
+    margin: 0.3rem 0 0;
+    font-size: 0.85rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #B9C7B4;
+    font-weight: 500;
+  }
+
+  .wrap{ max-width: 640px; margin: 0 auto; padding: 0 1.1rem; }
+
+  .card{
+    background: #FFFDF7;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.1rem 1.1rem 1.2rem;
+    margin-top: 1.3rem;
+    box-shadow: 0 1px 0 rgba(43,38,32,0.03);
+  }
+
+  .add-form{ display:grid; gap:0.6rem; }
+  .add-form .row1{ display:grid; grid-template-columns: 1fr; gap:0.6rem; }
+  .add-form .row2{ display:grid; grid-template-columns: 1fr 1fr 1.2fr; gap:0.6rem; }
+  label{ font-size:0.72rem; text-transform:uppercase; letter-spacing:1px; color:var(--ink-soft); font-weight:600; display:block; margin-bottom:3px; }
+  input, select{
+    width:100%;
+    font-family:'Work Sans', sans-serif;
+    font-size:0.95rem;
+    padding:0.55rem 0.6rem;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:#fff;
+    color:var(--ink);
+  }
+  input:focus, select:focus{ outline:2px solid var(--sage); outline-offset:1px; }
+  input[type=number]{ appearance: textfield; -moz-appearance: textfield; }
+
+  .btn-add{
+    margin-top:0.2rem;
+    background: var(--board);
+    color: var(--chalk);
+    border:none;
+    padding:0.7rem 1rem;
+    border-radius:7px;
+    font-weight:600;
+    font-size:0.92rem;
+    cursor:pointer;
+    letter-spacing:0.3px;
+  }
+  .btn-add:hover{ background: var(--board-2); }
+  .btn-add:active{ transform: scale(0.98); }
+
+  .section-title{
+    font-size:0.72rem;
+    text-transform:uppercase;
+    letter-spacing:1.5px;
+    color:var(--ink-soft);
+    font-weight:600;
+    margin: 1.5rem 0.2rem 0.5rem;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+
+  .list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:0.55rem; }
+
+  .item{
+    background:#FFFDF7;
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:0.7rem 0.75rem;
+    display:flex;
+    align-items:center;
+    gap:0.6rem;
+    cursor:grab;
+    transition: opacity 0.15s, transform 0.15s;
+  }
+  .item.dragging{ opacity:0.4; }
+  .item.checked{ opacity:0.5; }
+  .item.checked .item-name{ text-decoration: line-through; }
+
+  .handle{ color: var(--ink-soft); font-size:1rem; -webkit-user-select:none; user-select:none; line-height:1; padding-right:2px; }
+
+  .checkbox{
+    width:20px; height:20px; border-radius:5px; border:2px solid var(--sage);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer; background:#fff;
+  }
+  .checkbox.on{ background: var(--sage); }
+  .checkbox svg{ width:12px; height:12px; display:none; stroke:#fff; stroke-width:3; fill:none; }
+  .checkbox.on svg{ display:block; }
+
+  .item-main{ flex:1; min-width:0; }
+  .item-name{ font-weight:600; font-size:0.98rem; }
+  .item-meta{ font-size:0.8rem; color:var(--ink-soft); margin-top:1px; }
+
+  .qty-price{ display:flex; gap:4px; align-items:center; flex-shrink:0; }
+  .qty-price input{ width:52px; padding:0.35rem; text-align:center; font-size:0.85rem; }
+  .qty-price input.price{ width:66px; }
+  .times{ color:var(--ink-soft); font-size:0.8rem; }
+
+  .subtotal{
+    font-family:'Space Mono', monospace;
+    font-size:0.85rem;
+    min-width:64px;
+    text-align:right;
+    color:var(--ink);
+    flex-shrink:0;
+  }
+
+  .priority-tag{
+    font-size:0.68rem;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+    padding:3px 7px;
+    border-radius:5px;
+    border:none;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .priority-alta{ background:#F1DCC3; color: var(--mustard-ink); }
+  .priority-media{ background:#E4EADF; color: var(--sage-ink); }
+  .priority-baixa{ background:#EAE6DC; color: var(--ink-soft); }
+
+  .del-btn{
+    background:none; border:none; color: var(--brick); opacity:0.55; cursor:pointer;
+    font-size:1.1rem; padding:2px 4px; flex-shrink:0; line-height:1;
+  }
+  .del-btn:hover{ opacity:1; }
+
+  .empty{ text-align:center; color:var(--ink-soft); padding:2rem 0; font-size:0.9rem; }
+  .loading-tag{ display:none; }
+
+  .receipt{
+    position: fixed;
+    left:0; right:0; bottom:0;
+    background: var(--board);
+    color: var(--chalk);
+    padding: 0.85rem 1.1rem 1.1rem;
+    border-top: 4px dashed var(--paper-2);
+  }
+  .receipt-inner{ max-width: 640px; margin:0 auto; }
+  .receipt-row{ display:flex; justify-content:space-between; align-items:baseline; font-family:'Space Mono', monospace; font-size:0.8rem; color:#B9C7B4; padding:1px 0; }
+  .receipt-row.total{ font-size:1.35rem; color:var(--chalk); font-weight:700; padding-top:4px; }
+  .receipt-row.total span:last-child{ transition: transform 0.15s; }
+  .pulse{ animation: pulse 0.25s ease; }
+  @keyframes pulse{ 0%{ transform:scale(1);} 40%{ transform:scale(1.08);} 100%{ transform:scale(1);} }
+
+  @media (max-width:420px){
+    .add-form .row2{ grid-template-columns: 1fr 1fr; }
+    .add-form .row2 > div:last-child{ grid-column: 1 / -1; }
+    .qty-price input{ width:44px; }
+    .qty-price input.price{ width:58px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="board">
+  <h1>Lista de compras</h1>
+  <p>arraste para reordenar por prioridade</p>
+</div>
+
+<div class="wrap">
+
+  <div class="card">
+    <form class="add-form" id="addForm">
+      <div class="row1">
+        <div>
+          <label for="fName">Item</label>
+          <input type="text" id="fName" placeholder="Ex: detergente" required>
+        </div>
+      </div>
+      <div class="row2">
+        <div>
+          <label for="fQty">Quantidade</label>
+          <input type="number" id="fQty" min="0" step="0.5" value="1">
+        </div>
+        <div>
+          <label for="fPrice">Preço (R$)</label>
+          <input type="number" id="fPrice" min="0" step="0.01" value="0">
+        </div>
+        <div>
+          <label for="fPriority">Prioridade</label>
+          <select id="fPriority">
+            <option value="alta">Alta</option>
+            <option value="media" selected>Média</option>
+            <option value="baixa">Baixa</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="btn-add">Adicionar item</button>
+    </form>
+  </div>
+
+  <div class="section-title">
+    <span id="itemCount">0 itens</span>
+    <span id="loadingTag" class="loading-tag">carregando...</span>
+  </div>
+
+  <ul class="list" id="list"></ul>
+  <div class="empty" id="emptyMsg">Sua lista está vazia. Adicione um item acima.</div>
+
+</div>
+
+<div class="receipt">
+  <div class="receipt-inner">
+    <div class="receipt-row"><span>Já no carrinho</span><span id="checkedTotal">R$ 0,00</span></div>
+    <div class="receipt-row"><span>Falta comprar</span><span id="remainingTotal">R$ 0,00</span></div>
+    <div class="receipt-row total"><span>Total</span><span id="grandTotal">R$ 0,00</span></div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'lista-compras:itens';
+
+const defaultItems = [
+  { name: 'Arroz', priority: 'alta' },
+  { name: 'Feijão', priority: 'alta' },
+  { name: 'Óleo de soja', priority: 'alta' },
+  { name: 'Leite', priority: 'alta' },
+  { name: 'Ovos', priority: 'media' },
+  { name: 'Pão', priority: 'media' },
+  { name: 'Café', priority: 'media' },
+  { name: 'Açúcar', priority: 'media' },
+  { name: 'Leite condensado', priority: 'media' },
+  { name: 'Creme de leite', priority: 'media' },
+  { name: 'Água sanitária', priority: 'media' },
+  { name: 'Teiu', priority: 'baixa' },
+  { name: 'Veja', priority: 'media' },
+  { name: 'Papel higiênico', priority: 'media' },
+  { name: 'Carne musculo', priority: 'alta' },
+  { name: 'Carne moída', priority: 'alta' },
+  { name: 'Carne filé/patinho', priority: 'alta' },
+  { name: 'Cotonete', priority: 'media' },
+  { name: 'Extrato', priority: 'media' },
+  { name: 'Biscoito maisena', priority: 'baixa' },
+  { name: 'Biscoito recheado', priority: 'baixa' },
+  { name: 'Manteiga', priority: 'alta' },
+  { name: 'Margarina', priority: 'alta' },
+  { name: 'Requeijão cremoso', priority: 'baixa' },
+  { name: 'Molho de Tomate', priority: 'baixa' },
+  { name: 'Sobrecoxa de frango', priority: 'alta' },
+  { name: 'Peito de Frango', priority: 'baixa' },
+  { name: 'Bisteca de porco', priority: 'baixa' },
+  { name: 'Carne moida de porco', priority: 'baixa' },
+  { name: 'Macarrão spaguete', priority: 'alta' },
+  { name: 'Papel toalha', priority: 'baixa' },
+  { name: 'Papel Aluminio', priority: 'baixa' },
+  { name: 'Papel higiênico', priority: 'baixa' },
+  { name: 'Sabonete', priority: 'baixa' },
+  { name: 'Shapoo e Condicionador', priority: 'baixa' },
+  { name: '', priority: 'baixa' },
+].map((it, i) => ({
+  id: 'd' + i,
+  name: it.name,
+  qty: 1,
+  price: 0,
+  priority: it.priority,
+  checked: false,
+}));
+
+let items = [];
+let dragId = null;
+
+const listEl = document.getElementById('list');
+const emptyMsg = document.getElementById('emptyMsg');
+const itemCount = document.getElementById('itemCount');
+const loadingTag = document.getElementById('loadingTag');
+
+function fmt(n){
+  return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function loadItems(){
+  loadingTag.style.display = 'inline';
+  try{
+    const res = await window.storage.get(STORAGE_KEY, false);
+    items = res && res.value ? JSON.parse(res.value) : defaultItems;
+  } catch(e){
+    items = defaultItems;
+  }
+  loadingTag.style.display = 'none';
+  render();
+}
+
+async function saveItems(){
+  try{
+    await window.storage.set(STORAGE_KEY, JSON.stringify(items), false);
+  } catch(e){
+    console.error('Falha ao salvar', e);
+  }
+}
+
+function priorityLabel(p){
+  return p === 'alta' ? 'Alta' : p === 'baixa' ? 'Baixa' : 'Média';
+}
+
+function render(){
+  listEl.innerHTML = '';
+  emptyMsg.style.display = items.length ? 'none' : 'block';
+  itemCount.textContent = items.length + (items.length === 1 ? ' item' : ' itens');
+
+  items.forEach(item => {
+    const li = document.createElement('li');
+    li.className = 'item' + (item.checked ? ' checked' : '');
+    li.draggable = true;
+    li.dataset.id = item.id;
+
+    const subtotal = (item.qty || 0) * (item.price || 0);
+
+    li.innerHTML = `
+      <span class="handle" aria-hidden="true">&#8942;&#8942;</span>
+      <div class="checkbox ${item.checked ? 'on' : ''}" data-action="toggle">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </div>
+      <div class="item-main">
+        <div class="item-name">${escapeHtml(item.name)}</div>
+        <div class="item-meta">${fmt(item.price || 0)} / un.</div>
+      </div>
+      <div class="qty-price">
+        <input type="number" class="qty" value="${item.qty}" min="0" step="0.5" aria-label="Quantidade">
+        <span class="times">×</span>
+        <input type="number" class="price" value="${item.price}" min="0" step="0.01" aria-label="Preço unitário">
+      </div>
+      <div class="subtotal">${fmt(subtotal)}</div>
+      <select class="priority-tag priority-${item.priority}" data-action="priority" aria-label="Prioridade">
+        <option value="alta" ${item.priority === 'alta' ? 'selected' : ''}>Alta</option>
+        <option value="media" ${item.priority === 'media' ? 'selected' : ''}>Média</option>
+        <option value="baixa" ${item.priority === 'baixa' ? 'selected' : ''}>Baixa</option>
+      </select>
+      <button type="button" class="del-btn" data-action="delete" aria-label="Remover item">✕</button>
+    `;
+
+    li.querySelector('[data-action="toggle"]').addEventListener('click', () => {
+      item.checked = !item.checked;
+      saveItems();
+      render();
+      updateTotals();
+    });
+
+    li.querySelector('.qty').addEventListener('input', (e) => {
+      item.qty = parseFloat(e.target.value) || 0;
+      li.querySelector('.subtotal').textContent = fmt((item.qty || 0) * (item.price || 0));
+      updateTotals();
+    });
+    li.querySelector('.qty').addEventListener('change', saveItems);
+
+    li.querySelector('.price').addEventListener('input', (e) => {
+      item.price = parseFloat(e.target.value) || 0;
+      li.querySelector('.subtotal').textContent = fmt((item.qty || 0) * (item.price || 0));
+      li.querySelector('.item-meta').textContent = fmt(item.price || 0) + ' / un.';
+      updateTotals();
+    });
+    li.querySelector('.price').addEventListener('change', saveItems);
+
+    const prioritySelect = li.querySelector('[data-action="priority"]');
+    prioritySelect.addEventListener('change', (e) => {
+      item.priority = e.target.value;
+      prioritySelect.className = 'priority-tag priority-' + item.priority;
+      saveItems();
+    });
+
+    li.querySelector('[data-action="delete"]').addEventListener('click', () => {
+      items = items.filter(it => it.id !== item.id);
+      saveItems();
+      render();
+      updateTotals();
+    });
+
+    li.addEventListener('dragstart', () => {
+      dragId = item.id;
+      li.classList.add('dragging');
+    });
+    li.addEventListener('dragend', () => {
+      li.classList.remove('dragging');
+      saveItems();
+    });
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const dragging = listEl.querySelector('.dragging');
+      if (!dragging || dragging === li) return;
+      const rect = li.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height / 2;
+      listEl.insertBefore(dragging, before ? li : li.nextSibling);
+    });
+    li.addEventListener('drop', () => {
+      const newOrder = [...listEl.querySelectorAll('.item')].map(el => el.dataset.id);
+      items.sort((a, b) => newOrder.indexOf(a.id) - newOrder.indexOf(b.id));
+    });
+
+    listEl.appendChild(li);
+  });
+
+  updateTotals();
+}
+
+function updateTotals(){
+  let checkedTotal = 0, remainingTotal = 0;
+  items.forEach(it => {
+    const sub = (it.qty || 0) * (it.price || 0);
+    if (it.checked) checkedTotal += sub; else remainingTotal += sub;
+  });
+  const grand = checkedTotal + remainingTotal;
+
+  const grandEl = document.getElementById('grandTotal');
+  const prevText = grandEl.textContent;
+  const newText = fmt(grand);
+
+  document.getElementById('checkedTotal').textContent = fmt(checkedTotal);
+  document.getElementById('remainingTotal').textContent = fmt(remainingTotal);
+  grandEl.textContent = newText;
+
+  if (prevText !== newText){
+    grandEl.classList.remove('pulse');
+    void grandEl.offsetWidth;
+    grandEl.classList.add('pulse');
+  }
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+document.getElementById('addForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = document.getElementById('fName').value.trim();
+  if (!name) return;
+  const qty = parseFloat(document.getElementById('fQty').value) || 1;
+  const price = parseFloat(document.getElementById('fPrice').value) || 0;
+  const priority = document.getElementById('fPriority').value;
+
+  items.unshift({
+    id: 'i' + Date.now(),
+    name, qty, price, priority, checked: false,
+  });
+
+  e.target.reset();
+  document.getElementById('fQty').value = 1;
+  document.getElementById('fPrice').value = 0;
+  document.getElementById('fPriority').value = 'media';
+
+  saveItems();
+  render();
+  document.getElementById('fName').focus();
+});
+
+loadItems();
+</script>
+
+</body>
+</html>
