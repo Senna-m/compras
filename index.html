@@ -103,6 +103,23 @@
   }
   .btn-add:hover{ background: var(--board-2); }
   .btn-add:active{ transform: scale(0.98); }
+
+  .budget-form{ display:grid; grid-template-columns:1fr auto; gap:0.6rem; align-items:end; }
+  .budget-form button{
+    background:var(--mustard);
+    color:var(--ink);
+    border:none;
+    padding:0.65rem 0.9rem;
+    border-radius:7px;
+    font-weight:600;
+    font-size:0.9rem;
+    cursor:pointer;
+  }
+  .budget-form button:hover{ filter:brightness(0.95); }
+  .budget-help{ margin:0.65rem 0 0; color:var(--ink-soft); font-size:0.8rem; }
+  .budget-status{ margin:0.7rem 0 0; color:var(--sage-ink); font-size:0.9rem; font-weight:600; }
+  .budget-status.warning{ color:var(--mustard-ink); }
+  .budget-status.exceeded, .budget-status.error{ color:var(--brick-ink); }
  
   .section-title{
     font-size:0.72rem;
@@ -212,6 +229,7 @@
   @media (max-width:480px){
     .add-form .row2{ grid-template-columns: 1fr 1fr; }
     .add-form .row2 > div:last-child{ grid-column: 1 / -1; }
+    .budget-form{ grid-template-columns:1fr; }
  
     .item{ flex-wrap: wrap; row-gap: 8px; }
     .item-main{ flex-basis: 100%; order: 1; }
@@ -266,6 +284,18 @@
     </form>
   </div>
 
+  <div class="card">
+    <form class="budget-form" id="budgetForm">
+      <div>
+        <label for="budgetLimit">Limite de gastos (R$)</label>
+        <input type="number" id="budgetLimit" min="0.01" step="0.01" placeholder="Ex: 300,00">
+      </div>
+      <button type="submit">Salvar limite</button>
+    </form>
+    <p class="budget-help">Avisaremos quando o total atingir 80% do limite. Deixe o campo vazio e salve para remover o limite.</p>
+    <p class="budget-status" id="budgetStatus" role="status" aria-live="polite"></p>
+  </div>
+
   <div class="section-title">
     <span id="itemCount">0 itens</span>
     <span id="loadingTag" class="loading-tag">carregando...</span>
@@ -286,6 +316,7 @@
 
 <script>
 const STORAGE_KEY = 'lista-compras:itens';
+const BUDGET_STORAGE_KEY = 'lista-compras:limite';
 
 const defaultItems = [
   { name: 'Arroz', priority: 'alta' },
@@ -335,11 +366,15 @@ const defaultItems = [
 
 let items = [];
 let dragId = null;
+let budgetLimit = null;
+let budgetError = '';
 
 const listEl = document.getElementById('list');
 const emptyMsg = document.getElementById('emptyMsg');
 const itemCount = document.getElementById('itemCount');
 const loadingTag = document.getElementById('loadingTag');
+const budgetInput = document.getElementById('budgetLimit');
+const budgetStatus = document.getElementById('budgetStatus');
 
 function fmt(n){
   return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -352,6 +387,15 @@ async function loadItems(){
     items = res && res.value ? JSON.parse(res.value) : defaultItems;
   } catch(e){
     items = defaultItems;
+  }
+  try{
+    const res = await storageApi.get(BUDGET_STORAGE_KEY);
+    const savedLimit = res && res.value ? Number(res.value) : null;
+    budgetLimit = Number.isFinite(savedLimit) && savedLimit > 0 ? savedLimit : null;
+    budgetInput.value = budgetLimit === null ? '' : budgetLimit;
+  } catch(e){
+    console.error('Falha ao carregar o limite de gastos', e);
+    budgetError = 'Não foi possível carregar o limite salvo.';
   }
   loadingTag.style.display = 'none';
   render();
@@ -483,11 +527,36 @@ function updateTotals(){
   document.getElementById('checkedTotal').textContent = fmt(checkedTotal);
   document.getElementById('remainingTotal').textContent = fmt(remainingTotal);
   grandEl.textContent = newText;
+  updateBudgetStatus(grand);
 
   if (prevText !== newText){
     grandEl.classList.remove('pulse');
     void grandEl.offsetWidth;
     grandEl.classList.add('pulse');
+  }
+}
+
+function updateBudgetStatus(total){
+  budgetStatus.className = 'budget-status';
+  if (budgetError){
+    budgetStatus.classList.add('error');
+    budgetStatus.textContent = budgetError;
+    return;
+  }
+  if (budgetLimit === null){
+    budgetStatus.textContent = 'Defina um limite para acompanhar seus gastos.';
+    return;
+  }
+
+  const remaining = budgetLimit - total;
+  if (remaining < 0){
+    budgetStatus.classList.add('exceeded');
+    budgetStatus.textContent = `Limite ultrapassado em ${fmt(Math.abs(remaining))}. Total: ${fmt(total)} de ${fmt(budgetLimit)}.`;
+  } else if (total >= budgetLimit * 0.8){
+    budgetStatus.classList.add('warning');
+    budgetStatus.textContent = `Atenção: você já usou ${Math.round((total / budgetLimit) * 100)}% do limite. Restam ${fmt(remaining)}.`;
+  } else {
+    budgetStatus.textContent = `Restam ${fmt(remaining)} do limite de ${fmt(budgetLimit)}.`;
   }
 }
 
@@ -501,6 +570,31 @@ const storageApi = window.storage ? window.storage : {
   get: (key) => Promise.resolve({ value: localStorage.getItem(key) }),
   set: (key, value) => Promise.resolve(localStorage.setItem(key, value)),
 };
+
+document.getElementById('budgetForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const inputValue = budgetInput.value.trim();
+  const nextLimit = inputValue === '' ? null : Number(inputValue);
+  if (nextLimit !== null && (!Number.isFinite(nextLimit) || nextLimit <= 0)){
+    budgetInput.setCustomValidity('Informe um limite maior que zero ou deixe o campo vazio para remover.');
+    budgetInput.reportValidity();
+    return;
+  }
+
+  budgetInput.setCustomValidity('');
+  budgetLimit = nextLimit;
+  try{
+    await storageApi.set(BUDGET_STORAGE_KEY, budgetLimit === null ? '' : String(budgetLimit));
+    budgetError = '';
+    updateTotals();
+  } catch(e){
+    console.error('Falha ao salvar o limite de gastos', e);
+    budgetError = 'Não foi possível salvar o limite. Tente novamente.';
+    updateTotals();
+  }
+});
+
+budgetInput.addEventListener('input', () => budgetInput.setCustomValidity(''));
 
 document.getElementById('addForm').addEventListener('submit', (e) => {
   e.preventDefault();
